@@ -78,514 +78,548 @@ Dataset yang digunakan memuat dimensi sebesar **1020 baris** dan **11 kolom**. U
 | 10    | **card**          | External memory card type and maximum capacity (e.g., microSDXC).            | object         |
 | 11    | **os**            | Operating system of the mobile phone.                                        | object         |
 
+Jumlah kolom dan baris setelah data diload adalah sebagai berikut:
+
+
+| **Kolom**   | **Jumlah Data** |
+|-------------|-----------------|
+| model       | 1020            |
+| price       | 1020            |
+| rating      | 879             |
+| sim         | 1020            |
+| processor   | 1020            |
+| ram         | 1020            |
+| battery     | 1020            |
+| display     | 1020            |
+| camera      | 1019            |
+| card        | 1013            |
+| os          | 1003            |
+
 ### Exploratory Data Analysis 
+#### Distribusi Rating Produk 
 ![image](https://github.com/garr007/ProjectRecommenderSystem/blob/main/grafik%201.png?raw=true)
 
+Rating paling sering berada di rentang **80-85**, menunjukkan bahwa mayoritas produk memiliki penilaian positif. Ini menggambarkan bahwa produk dalam dataset cenderung memiliki kualitas yang baik, dengan sebagian besar memperoleh rating tinggi dari pengguna.
 
-### Checking Missing Values,Duplicate Data dan Outlier
-##### Checking Missing Values
-Skrip Python cek nilai null
+Rating secara umum cenderung meningkat dari 60 hingga mencapai puncaknya di sekitar 80-85 sebelum kembali menurun.
+
+#### 10 Produk Dengan Rating Tertinggi
+![image](https://github.com/garr007/ProjectRecommenderSystem/blob/dd6d77ac5d0d734ca1db654cc7c51f9e3cadf916/grafik%203.png)
+
+Produk dengan rating tertinggi adalah OnePlus 11 5G, diikuti oleh Xiaomi 12T Pro 5G dan Infinix Zero Ultra.
+
+Semua produk dalam grafik memiliki rating yang sangat baik, mendekati atau sama.
+
+#### Distribusi Brand Produk 
+![image](https://github.com/garr007/ProjectRecommenderSystem/blob/dd6d77ac5d0d734ca1db654cc7c51f9e3cadf916/grafik%204.png)
+
+Xiaomi dan Samsung adalah dua brand dengan jumlah produk terbanyak, masing-masing melebihi 100 produk.Brand seperti Vivo, Realme, dan Oppo juga memiliki kontribusi besar terhadap total produk.
+
+#### Distribusi Harga Produk 
+![image](https://github.com/garr007/ProjectRecommenderSystem/blob/dd6d77ac5d0d734ca1db654cc7c51f9e3cadf916/grafik%205.png)
+
+Sebagian besar produk memiliki harga rendah, terbukti dari puncak yang tinggi di kisaran harga rendah (di bawah ₹100.000). 
+
+Grafik ini mengindikasikan bahwa sebagian besar produk berada di kategori harga terjangkau, dengan hanya sedikit produk di kategori harga premium.
+
+#### Perbandingan 5 Produk Termahal dan Termurah
+![image](https://github.com/garr007/ProjectRecommenderSystem/blob/dd6d77ac5d0d734ca1db654cc7c51f9e3cadf916/grafik%206.png)
+
+Produk dengan ID P432 memiliki harga tertinggi sebesar ₹650.000, diikuti oleh P922 (₹480.000), dan tiga lainnya di kisaran ₹199.990–₹239.999.
+Produk termahal memiliki perbedaan harga yang signifikan, terutama antara P432 dan P922.
+
+Harga produk termurah berada di kisaran ₹99–₹958, dengan produk termurah adalah P609 (₹99).
+Harga produk murah cukup seragam dan tidak terlalu bervariasi dibandingkan kelompok termahal.
+
+### Data Preparation 
+#### Pembersihan dan Ekstraksi Data
+
+Proses data preparation yang dilakukan bertujuan untuk membersihkan, memproses, dan menambahkan informasi baru pada dataset agar lebih siap untuk analisis, visualisasi, dan modeling. Berikut adalah penjelasan dari langkah-langkah yang dilakukan:
+
+1. Penambahan Kolom Unik product_id
 ```
-pd.DataFrame({'Missing Value':df_cleaned.isnull().sum()})
+dataset['product_id'] = ['P' + str(i + 1) for i in range(len(dataset))]
+```
+Untuk memberikan ID unik pada setiap produk, sehingga mempermudah pelacakan dan analisis. ID unik dibuat dengan format "P1", "P2", dan seterusnya menggunakan kombinasi string dan indeks.
+
+
+2. Penambahan Kolom brand
+```
+dataset["brand"] = dataset["model"].str.split().str[0]
+```
+Memudahkan analisis berdasarkan merek (brand) dengan mengekstrak nama brand dari kolom model. Nama brand diambil dari kata pertama pada kolom model.
+
+3. Membersihkan Kolom price
+```
+dataset['price'] = dataset['price'].replace({'₹': '', ',': ''}, regex=True)
+```
+Menghapus simbol mata uang (₹) dan tanda koma untuk memungkinkan konversi ke format numerik. Menggunakan fungsi replace dengan ekspresi reguler untuk menghapus karakter yang tidak relevan.
+
+4. Konversi price ke Format Numerik
+```
+dataset['price'] = pd.to_numeric(dataset['price'])
+```
+Mengubah harga ke tipe numerik agar dapat digunakan dalam visualisasi atau modeling.
+Fungsi pd.to_numeric diterapkan setelah pembersihan.
+
+
+5. Membersihkan dan Memperbaiki Kolom ram
+```
+dataset["ram"] = dataset["ram"].str.replace(r"\u2009", " ", regex=True)\
+dataset["ram"] = dataset["ram"].str.replace(r"(\d+)\s?TB", lambda x: str(int(x.group(1)) * 1024) + " GB inbuilt", regex=True)
+```
+Menghapus karakter non-breaking space yang dapat mengganggu pemrosesan.
+Mengonversi satuan TB ke GB untuk menjaga konsistensi data. Menggunakan replace untuk membersihkan spasi non-breaking.
+Ekspresi reguler dengan fungsi lambda untuk mengganti satuan TB ke GB (1 TB = 1024 GB).
+
+6. Ekstraksi RAM dan Storage
+```
+dataset[["ram_size", "storage_size"]] = dataset["ram"].str.extract(r"(\d+)\s?GB RAM.*?(\d+)\s?GB inbuilt")
+dataset["ram_size"] = dataset["ram_size"].astype(float)
+dataset["storage_size"] = dataset["storage_size"].astype(float)
+```
+Memisahkan informasi RAM dan storage ke dalam kolom yang berbeda (ram_size dan storage_size). Ekstraksi menggunakan regex untuk menangkap angka diikuti dengan satuan GB, lalu mengonversinya ke tipe data float.
+
+7. Ekstraksi battery_capacity
+```
+dataset['battery_capacity'] = dataset['battery'].str.extract(r'(\d+)\s?mAh').astype(float)
+```
+Membuat kolom baru yang hanya berisi kapasitas baterai dalam mAh. Menggunakan regex untuk mengekstrak angka dari kolom battery, lalu mengonversinya ke tipe data float.
+
+#### Checking Missing Values dan Duplicate Data
+###### Checking Missing Values
+```
+pd.DataFrame({'Missing Value':dataset.isnull().sum()})
 ```
 
-| No. | Nama Fitur               | Missing Value |
-|-----|--------------------------|---------------|
-| 1   | Hours_Studied            | 0             |
-| 2   | Attendance               | 0             |
-| 3   | Parental_Involvement     | 0             |
-| 4   | Access_to_Resources      | 0             |
-| 5   | Extracurricular_Activities | 0           |
-| 6   | Sleep_Hours              | 0             |
-| 7   | Previous_Scores          | 0             |
-| 8   | Motivation_Level         | 0             |
-| 9   | Internet_Access          | 0             |
-| 10  | Tutoring_Sessions        | 0             |
-| 11  | Family_Income            | 0             |
-| 12  | Teacher_Quality          | 78            |
-| 13  | School_Type              | 0             |
-| 14  | Peer_Influence           | 0             |
-| 15  | Physical_Activity        | 0             |
-| 16  | Learning_Disabilities    | 0             |
-| 17  | Parental_Education_Level | 90            |
-| 18  | Distance_from_Home       | 67            |
-| 19  | Gender                   | 0             |
-| 20  | Exam_Score               | 0             |
+| No  | Kolom              | Missing Value |
+|------|---------------------|---------------|
+| 1    | model              | 0             |
+| 2    | price              | 0             |
+| 3    | rating             | 141           |
+| 4    | sim                | 0             |
+| 5    | processor          | 0             |
+| 6    | ram                | 0             |
+| 7    | battery            | 0             |
+| 8    | display            | 0             |
+| 9    | camera             | 1             |
+| 10   | card               | 7             |
+| 11   | os                 | 17            |
+| 12   | product_id         | 0             |
+| 13   | brand              | 0             |
+| 14   | ram_size           | 42            |
+| 15   | storage_size       | 42            |
+| 16   | battery_capacity   | 33            |
 
 Berikut adalah fitur-fitur yang memiliki nilai _null_:
-- **Teacher_Quality**: 78
-- **Parental_Education_Level**: 90
-- **Distance_from_home**: 67
+- **rating**: 141
+- **camera**: 1
+- **card**: 7
+- **os**: 17
+- **ram_size**: 42
+- **ram_size**: 42
+- **battery_capacity**: 33
 
-Total nilai _null_ pada dataset adalah 78 + 90 + 67 = **235**
+Total nilai _null_ pada dataset adalah 78 + 90 + 67 = **259**
 
-Dengan dimensi dataset 6,607 baris dan 20 kolom menjadikan total data pada dataset adalah 6,607 * 20 = **132,140**
-
-Dengan demikian, persentase jumlah nilai _null_ pada dataset adalah 235/132,140 * 100 = **0.18%**, di mana persentase tersebut sangat kecil sehingga untuk _handling_ nilai _null_ pada dataset, baris yang memuat nilai-nilai _null_ tersebut cukup dihapuskan karena tidak akan mempengaruhi informasi yang dimuat oleh keseluruhan data.
+Baris yang memiliki nilai null akan dihapus dengan perintah:
+```
+dataset_clean = dataset.dropna()
+```
 
 ##### Checking Duplicate Data
-Skrip Python cek nilai duplikat
 ```
-df_cleaned.duplicated().sum()
+duplicated_data = pd.DataFrame({'Duplicated Data': [dataset.duplicated().sum()]})
 ```
 
 0
 
-Tidak terdapat nilai duplikat dalam dataset yang digunakan.
 
-### Outlier Detection
+Tidak ada dulicated data yang ditemukan pada dataset
 
-![image](https://github.com/user-attachments/assets/33c547e1-3af9-4f4e-969b-66780eead2dd)
 
-Berikut adalah interpretasi dari boxplot yang ditampilkan di atas:
+Setelah dibersihkan sekarang jumlah kolom dan baris pada data adalah sebagai berikut :
+**Jumlah baris dan kolom:** `(868, 16)`
 
-- Pada kolom Hours_Studied, terlihat beberapa outlier di sisi kiri (sekitar 0-5 jam) dan di sisi kanan (sekitar 35-45 jam). Meski demikian, 0-5 jam per minggu Ini mungkin terjadi, terutama jika seorang siswa tidak terlalu fokus pada studi, memiliki komitmen lain. 35-45 jam per minggu juga mungkin, terutama untuk siswa yang sangat berdedikasi. Outlier ini tidak akan dihapus karena memberikan gambaran lengkap tentang bagaimana siswa berbeda dalam waktu belajar.
+**Jumlah baris:** `868`
 
-- Pada kolom Tutoring_Sessions, dapat dilihat bahwa nilai 4 hingga 8 sesi per bulan, dianggap sebagai outliers secara statistik. Namun nilai-nilai ini sangat memungkinkan karena ada siswa yang mungkin merasa perlu belajar lebih banyak sehingga outlier tidak akan dihapus.
+**Jumlah data di setiap kolom:**
 
-- Pada kolom Exam_Score, dapat dilihat bahwa mayoritas exam_score di rentang 65-70. Terdapat beberapa outlier, yaitu exam_score 75 ke atas. Namun terdapat outlier yaitu Exam_Score yang bernilai 101 yang mana tidak mungkin pada konteks ujian. Outlier lainnya akan dipertahankan karena sangat memungkinkan jika siswa mendapatkan nilai 75 keatas dan tidak melebihi 100.
+| **Kolom**            | **Jumlah Data** |
+|-----------------------|-----------------|
+| model                | 868             |
+| price                | 868             |
+| rating               | 868             |
+| sim                  | 868             |
+| processor            | 868             |
+| ram                  | 868             |
+| battery              | 868             |
+| display              | 868             |
+| camera               | 868             |
+| card                 | 868             |
+| os                   | 868             |
+| product_id           | 868             |
+| brand                | 868             |
+| ram_size             | 868             |
+| storage_size         | 868             |
+| battery_capacity     | 868             |
 
-- Pada kolom-kolom lainnya, dapat dilihat bahwa persebaran data merata dan tidak terdapat outlier yang signifikan. Secara keseluruhan, data ini siap untuk diproses dan dianalisis lebih mendalam tanpa perlu melakukan penghapusan outlier.
 
-### Mengecek Exam_Score yang nilainya lebih dari 100 
+## Modeling 
+Content-based Filtering: Pendekatan ini mengandalkan informasi terkait atribut produk untuk memberikan rekomendasi. Dalam hal ini, digunakan dua ukuran jarak yaitu Cosine Similarity dan Euclidean Distance untuk menghitung kesamaan antara produk-produk berdasarkan fitur yang relevan.
+
+Collaborative Filtering: Pendekatan ini memanfaatkan data interaksi pengguna untuk memberikan rekomendasi. Dua teknik utama yang digunakan adalah:
+
+K-Nearest Neighbors (KNN): Algoritma ini digunakan untuk mencari pengguna atau produk yang serupa berdasarkan preferensi yang ada.
+Deep Learning Auto Encoder: Model ini digunakan untuk melakukan pemodelan data dalam bentuk yang lebih terkompresi dan menangkap pola hubungan yang lebih kompleks antar pengguna dan produk.
+
+### Content Based Filtering 
+### Cosine Similarity 
+Cosine similarity mengukur **sudut** antara dua vektor dalam ruang multidimensi. Semakin kecil sudut antara dua vektor, semakin mirip kedua vektor tersebut. Jika dua vektor memiliki arah yang sama, maka cosine similarity mereka akan mendekati **1**, sedangkan jika arah mereka berlawanan, nilai cosine similarity-nya akan mendekati **-1**. Jika kedua vektor tegak lurus (tidak ada kesamaan), nilai cosine similarity-nya adalah **0**.
+
+Secara matematis, cosine similarity antara dua vektor **A** dan **B** dihitung dengan rumus berikut:
+
+Cosine Similarity = (A ⋅ B) / (||A|| ||B||)
+
+Dimana:
+- **A** dan **B** adalah dua vektor yang ingin dihitung kesamaannya.
+- **A ⋅ B** adalah hasil perkalian titik (dot product) antara vektor A dan vektor B, yang dihitung dengan menjumlahkan hasil perkalian elemen yang sesuai dari kedua vektor.
+  
+A ⋅ B = Σ (A_i × B_i)
+
+- **||A||** dan **||B||** adalah panjang (norma) dari masing-masing vektor, yang dihitung menggunakan rumus Euclidean distance:
+
+||A|| = √(Σ A_i²)
+
+||B|| = √(Σ B_i²)
+
+#### Konsep Perhitungan
+1. **Perkalian Titik (Dot Product)**: Menghitung total kontribusi antara elemen-elemen yang sesuai dalam kedua vektor. Semakin besar hasil perkalian titik, semakin tinggi kesamaan antara kedua vektor.
+
+2. **Normalisasi Vektor**: Vektor-divisor digunakan untuk menghilangkan efek panjang vektor dan hanya mempertimbangkan arah vektor. Ini berarti bahwa dua vektor dengan panjang yang berbeda tetap bisa memiliki cosine similarity yang tinggi jika arahnya mirip.
+
+3. **Hasil**: Nilai hasil dari cosine similarity akan berada dalam rentang antara -1 hingga 1:
+   - **1**: Vektor memiliki arah yang sama (mereka identik dalam hal fitur).
+   - **0**: Vektor tegak lurus (tidak ada kesamaan).
+   - **-1**: Vektor memiliki arah yang berlawanan.
+
+**Kelebihan:**
+
+1. **Mengabaikan Skala**: Tidak terpengaruh oleh perbedaan ukuran antara data.
+2. **Efisien dan Sederhana**: Mudah dihitung dan cepat diterapkan.
+3. **Cocok untuk Data Sparse**: Efektif untuk data dengan banyak nol, seperti dalam teks atau rekomendasi.
+4. **Tidak Terpengaruh oleh Magnitudo**: Fokus pada arah, bukan ukuran data.
+
+**Kekurangan:**
+
+1. **Tidak Memperhitungkan Magnitudo**: Hanya melihat arah, tidak panjang data.
+2. **Sensitif terhadap Fitur Tidak Relevan**: Fitur berisik dapat mempengaruhi hasil.
+3. **Tidak Cocok untuk Data Non-Linear**: Kurang efektif untuk data dengan hubungan yang kompleks.
+4. **Tidak Menghitung Urutan Data**: Tidak memperhitungkan urutan elemen dalam data.
+##### Cosine Similarity berdasarkan 'os' dan 'brand'
 ```
-df_cleaned[df_cleaned["Exam_Score"] > 100]
+recommended_products = recommend_products_os_brand('P4')
 ```
-Karena maksimal nilai untuk sebuah ujian adalah 100, hasilnya 
-| Hours Studied | Attendance | Parental Involvement | Access to Resources | Extracurricular Activities | Sleep Hours | Previous Scores | Motivation Level | Internet Access | Tutoring Sessions | Family Income | Teacher Quality | School Type | Peer Influence | Physical Activity | Learning Disabilities | Parental Education Level | Distance from Home | Gender  | Exam Score |
-|---------------|------------|----------------------|----------------------|----------------------------|-------------|-----------------|------------------|-----------------|-------------------|---------------|----------------|-------------|----------------|----------------|---------------------|------------------------|------------------|---------|------------|
-| 1525          | 27         | 98                  | Low                  | Medium                     | Yes         | 6               | 93               | Low             | No                | 5             | High           | High        | Public         | Positive       | 3                  | No                     | High School        | Moderate | Female  | 101        |
-Terdapat 1 baris data yang perlu dihapus.
-### Exploratory Data Analysis (EDA)
+Produk yang Diminta
 
-**Univariate Analysis**
+| **product_id** | **model**               | **os**        | **brand**    |
+|----------------|-------------------------|---------------|--------------|
+| P4             | Motorola Moto G62 5G    | Android v12   | Motorola     |
 
-Berikut adalah analisis jumlah nilai dari masing-masing fitur kategorikal:
+10 Rekomendasi Produk Teratas Berdasarkan OS dan Brand
 
-![image](https://github.com/user-attachments/assets/92f50b2e-ef9f-4bd0-ba25-3b5651ea1909)
+| **product_id** | **os**        | **brand**   | **similarity_score** |
+|----------------|---------------|-------------|----------------------|
+| P54            | Android v12   | Motorola    | 1.000000             |
+| P60            | Android v12   | Motorola    | 1.000000             |
+| P81            | Android v12   | Motorola    | 1.000000             |
+| P93            | Android v12   | Motorola    | 1.000000             |
+| P127           | Android v12   | Motorola    | 1.000000             |
+| P152           | Android v12   | Motorola    | 1.000000             |
+| P188           | Android v12   | Motorola    | 1.000000             |
+| P195           | Android v12   | Motorola    | 1.000000             |
+| P205           | Android v12   | Motorola    | 1.000000             |
+| P351           | Android v12   | Motorola    | 1.000000             |
 
-Secara umum, plot-plot pada gambar diatas dapat diinterpretasikan sebagai berikut:
-
-- **Parental_Involvement**: Sebagian besar siswa memiliki keterlibatan orang tua di level medium.
-- **Access_to_Resources**: Sebagian besar siswa memiliki akses ke sumber daya pada level medium.
-- **Extracurricular_Activities**: Sebagian besar siswa terlibat dalam aktivitas ekstrakurikuler.
-- **Motivation_Level**: Sebagian besar siswa memiliki tingkat motivasi pada level medium.
-- **Internet_Access**: Sebagian besar siswa memiliki akses internet.
-- **Family_Income**: Sebaran data pendapatan keluarga siswa cukup merata antara level medium dan low.
-- **Teacher_Quality**: Sebagian besar siswa memiliki kualitas guru di level medium.
-- **School_Type**: Sebagian besar siswa berasal dari sekolah negeri (public).
-- **Peer_Influence**: Sebaran data pengaruh teman sebaya cukup merata di level neutral dan positive.
-- **Learning_Disabilites**: Sebagian besar siswa tidak memiliki disabilitas belajar.
-- **Parental_Education_Level**: Sebagian besar siswa memiliki orang tua dengan tingkat pendidikan setara sekolah menengah atas.
-- **Distance_from_Home**: Sebagian besar siswa memiliki jarak tempat tinggal yang dekat dari sekolah.
-- **Gender**: Sebagian besar siswa adalah laki-laki.
-
-Berikut adalah analisis distribusi nilai dari masing-masing fitur numerikal:
-
-![image](https://github.com/user-attachments/assets/25bc4205-44df-4a88-9cf2-fc8d191b2110)
-
-Berdasarkan hasil plot histogram yang disajikan, dapat diinterpretasikan sebagai berikut:
-
-- **Hours_Studied**: Distribusi data membentuk kurva normal dengan puncak di sekitar 20-25 jam. Mayoritas mahasiswa belajar sekitar 20-30 jam. Terdapat beberapa mahasiswa dengan jam belajar yang lebih ekstrim, baik sangat sedikit maupun sangat banyak.
-- **Attendance**: Distribusi data menunjukkan pola bimodal, dengan dua puncak di sekitar 70-80% dan 90-100%. Mayoritas mahasiswa memiliki kehadiran di atas 80%. Terdapat beberapa mahasiswa dengan kehadiran yang rendah.
-- **Sleep_Hours**: Distribusi data menunjukkan pola normal dengan puncak di sekitar 6-8 jam tidur. Mayoritas mahasiswa tidur sekitar 6-8 jam per hari. Terdapat beberapa mahasiswa dengan jam tidur yang ekstrim, baik sedikit maupun banyak.
-- **Previous_Scores**: Distribusi data cenderung simetris dengan puncak di sekitar 70-80. Mayoritas mahasiswa memiliki skor sebelumnya di rentang 70-80. Terdapat beberapa mahasiswa dengan skor yang sangat rendah maupun sangat tinggi.
-- **Tutoring_Sessions**: Distribusi data menunjukkan pola bimodal dengan dua puncak di sekitar 1 dan 6 sesi. Mayoritas mahasiswa mengikuti 1-2 sesi tutorial atau 5-6 sesi tutorial. Terdapat beberapa mahasiswa dengan jumlah sesi tutorial yang sangat sedikit maupun sangat banyak.
-- **Physical_Activity**: Distribusi data menunjukkan pola bimodal dengan dua puncak yang jelas. Mayoritas mahasiswa memiliki aktivitas fisik yang rendah atau sangat tinggi. Terdapat sedikit mahasiswa dengan aktivitas fisik yang moderat.
-- **Exam_Score**: Distribusi data cenderung normal dengan puncak di sekitar 70-80. Mayoritas mahasiswa memperoleh skor ujian di rentang 70-80. Terdapat beberapa mahasiswa dengan skor ujian yang sangat rendah maupun sangat tinggi.
-
-**Multivariate Analysis**
-
-![image](https://github.com/user-attachments/assets/8db8b289-7e22-4aef-9799-eaabba62ea75)
-
-| Feature                      | Category          | Average Exam Score |
-|------------------------------|-------------------|---------------------|
-| Parental Involvement         | High              | 68.112200          |
-|                              | Low               | 66.351938          |
-|                              | Medium            | 67.113196          |
-| Access to Resources          | High              | 68.103158          |
-|                              | Low               | 66.223705          |
-|                              | Medium            | 67.145801          |
-| Extracurricular Activities   | No                | 66.951770          |
-|                              | Yes               | 67.446138          |
-| Motivation Level             | High              | 67.743931          |
-|                              | Low               | 66.746108          |
-|                              | Medium            | 67.338894          |
-| Internet Access              | No                | 66.483471          |
-|                              | Yes               | 67.309520          |
-| Family Income                | High              | 67.814483          |
-|                              | Low               | 66.853215          |
-|                              | Medium            | 67.371005          |
-| Teacher Quality              | High              | 67.664391          |
-|                              | Low               | 66.775889          |
-|                              | Medium            | 67.118662          |
-| School Type                  | Private           | 67.316358          |
-|                              | Public            | 67.216332          |
-| Peer Influence               | Negative          | 66.582707          |
-|                              | Neutral           | 67.215631          |
-|                              | Positive          | 67.623433          |
-| Learning Disabilities        | No                | 67.358557          |
-|                              | Yes               | 66.291916          |
-| Parental Education Level     | College           | 67.358432          |
-|                              | High School       | 66.884104          |
-|                              | Postgraduate      | 67.972656          |
-| Distance from Home           | Far               | 66.498428          |
-|                              | Moderate          | 66.969072          |
-|                              | Near              | 67.513812          |
-| Gender                       | Female            | 67.262179          |
-|                              | Male              | 67.235629          |
-
-Hasil analisis di atas dapat diinterpretasikan sebagai berikut:
-
-- Learning_Disabilities: Mahasiswa tanpa learning disabilities memiliki rata-rata skor ujian yang lebih tinggi (67.36) dibandingkan dengan yang memiliki learning disabilities (66.29).
-- Parental_Involvement: Mahasiswa dengan keterlibatan orang tua yang tinggi memiliki rata-rata skor ujian yang lebih tinggi (68.11) dibandingkan dengan yang rendah (66.35) atau sedang (67.11).
-- Access_to_Resources: Mahasiswa dengan akses sumber daya yang tinggi memiliki rata-rata skor ujian yang lebih tinggi (68.10) dibandingkan dengan yang rendah (66.22) atau sedang (67.15).
-- Extracurricular_Activities: Mahasiswa yang terlibat dalam kegiatan ekstrakurikuler memiliki rata-rata skor ujian yang lebih tinggi (67.45) dibandingkan dengan yang tidak terlibat (66.95).
-- Motivation_Level: Mahasiswa dengan motivasi tinggi memiliki rata-rata skor ujian yang lebih tinggi (67.74) dibandingkan dengan yang rendah (66.75) atau sedang (67.34). Variabel lainnya juga menunjukkan perbedaan rata-rata skor ujian, meskipun mungkin tidak terlalu signifikan.
-
-![image](https://github.com/user-attachments/assets/144243cb-8d39-4856-bd28-fb433da19106)
-
-Berdasarkan heatmap yang ditunjukkan, dapat disimpulkan bahwa:
-*   Terdapat korelasi positif yang kuat antara variabel-variabel tertentu,
-yaitu jam belajar (Hours_Studied) dengan skor ujian (Exam_Score), serta kehadiran (Attendance) dengan skor ujian.
-*   Terdapat korelasi positif yang lemah antara variabel-variabel tertentu,
-yaitu nilai sebelumnya (Previous_Score) dengan skor ujian (Exam_Score), serta banyak sesi les (Tutoring_Sessions) dengan skor ujian.
-
-![image](https://github.com/user-attachments/assets/51dce7a4-18bc-4a0f-a8fc-56b5d5586dbd)
-
-Berdasarkan plot scatter yang disajikan, dapat disimpulkan bahwa:
-*   Terdapat korelasi positif yang kuat antara persentase kehadiran siswa dan nilai ujian. Semakin tinggi kehadiran, semakin tinggi pula nilai ujian yang diraih.
-*   Terdapat korelasi positif yang kuat antara jam belajar per minggu siswa dan nilai ujian. Semakin banyak jam belajar, semakin tinggi pula nilai ujian yang diraih.
-*   Terdapat korelasi positif lemah antara nilai siswa sebelumnya dan nilai ujian. Dapat diartikan nilai sebelumnya hanya sedikit mempengaruhi nilai ujian.
-*   Terdapat korelasi positif yang cukup kuat antara sesi les yang diikuti siswa per bulan dan nilai ujian. Tren visualnya menunjukkan garis tren yang naik, artinya semakin banyak sesi les yang diikuti, nilai ujian cenderung juga semakin tinggi, namun penyebaran data terlihat lebih banyak di bagian kiri.
-
-## Data Preparation
-Berdasarkan pengecekan data yang dilakukan pada tahap data understanading, perlu dilakukan beberapa proses handling terhadap data.
-### Data Cleaning
-#### Null Value Handling
-Untuk menghapus nilai _null_ menggunakan sintaks:
-
+##### Cosine Similarity berdasarkan data numeric berdasarkan ram size, storage size, dan battery capacity
 ```
-# Menghapus baris yang memiliki missing values
-df_cleaned = data.dropna()
+recommended_products = recommend_products('P4')
 ```
+Produk yang Diminta
 
-#### Outlier Handling pada Kolom Exam_Score
-Berikut adalah sintaks kode Python untuk menghapus baris yang memiliki Exam_Score lebih dari 100:
+| **product_id** | **model**               | **ram_size** | **storage_size** | **battery_capacity** |
+|----------------|-------------------------|--------------|------------------|----------------------|
+| P4             | Motorola Moto G62 5G    | 6.0          | 128.0            | 5000.0               |
+
+10 Rekomendasi Produk Teratas
+
+| **product_id** | **ram_size** | **storage_size** | **battery_capacity** | **similarity_score** |
+|----------------|--------------|------------------|----------------------|----------------------|
+| P5             | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P6             | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P11            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P13            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P14            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P32            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P35            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P41            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P42            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+| P43            | 6.0          | 128.0            | 5000.0               | 1.0                  |
+### Eudlidean Distance 
+Euclidean Distance adalah ukuran yang digunakan untuk menghitung jarak antara dua titik dalam ruang multidimensi. Dalam konteks sistem rekomendasi produk, Euclidean Distance digunakan untuk mengukur kedekatan antara dua produk berdasarkan fitur-fitur yang dimilikinya (seperti ukuran RAM, kapasitas penyimpanan, dan daya baterai).
+
+#### Cara Kerja Euclidean Distance
+
+Secara umum, Euclidean Distance mengukur jarak linear antara dua titik dalam ruang tersebut. Setiap produk direpresentasikan sebagai titik dalam ruang, dan jarak antara dua titik dihitung dengan menggunakan rumus Euclidean.
+
+##### Rumus Euclidean Distance
+
+Rumus Euclidean Distance antara dua titik A dan B adalah sebagai berikut:
+
+d(A, B) = √[(x₂ - x₁)² + (y₂ - y₁)² + (z₂ - z₁)²]
+
+Di mana:
+- x₁, y₁, z₁ adalah fitur produk pertama (misalnya RAM, kapasitas penyimpanan, dan daya baterai),
+- x₂, y₂, z₂ adalah fitur produk kedua,
+- d(A, B) adalah jarak Euclidean antara produk A dan B.
+
+Jika produk memiliki lebih dari tiga fitur, rumusnya diperluas menjadi:
+
+d(A, B) = √[(x₁ - x₂)² + (y₁ - y₂)² + (z₁ - z₂)² + ...]
+
+**Kelebihan:**
+
+1. **Mudah Dipahami dan Dihitung**: Mengukur jarak langsung antara dua titik dalam ruang fitur.
+2. **Cocok untuk Data Berukuran Sama**: Efektif jika data memiliki skala dan ukuran yang sama.
+3. **Kesesuaian dengan Jarak Fisik**: Cocok untuk masalah yang melibatkan jarak nyata, seperti pengenalan pola dan pengelompokan.
+
+**Kekurangan:**
+
+1. **Sensitif terhadap Skala**: Tidak dapat mengatasi fitur dengan skala yang berbeda tanpa normalisasi.
+2. **Terpengaruh Outlier**: Nilai ekstrim dapat memengaruhi perhitungan jarak secara signifikan.
+3. **Tidak Baik untuk Data Spars**: Kurang efektif ketika data memiliki banyak nol atau elemen yang hilang.
+4. **Kurang Tepat untuk Data Non-Linear**: Tidak cocok untuk data yang memiliki hubungan non-linear atau kompleks.
+
+##### Euclidean Distance berdasarkan 'os' dan 'brand'
 ```
-df_cleaned.drop(df_cleaned[df_cleaned["Exam_Score"] > 100].index, inplace=True)
+recommended_products = recommend_products_os_brand_euclidean('P7')
 ```
-### Encoding
-Encoding adalah proses mengubah nilai kategorikal dalam dataset menjadi nilai numerikal. Hal ini dicapai dengan membuat nilai-nilai unik dalam sebuah fitur menjadi fitur-fitur baru yang didalamnya (sebagai contoh) bernilai 1 untuk mewakili 'ya' dan 0 untuk mewakili 'tidak'. Terdapat 3 macam teknik encoding yang digunakan, yaitu Categorical Encoding, One Hot Encoding, dan Ordinal Encoding.
+Produk yang Diminta
 
-Berikut adalah penjelasan singkat mengenai tiga teknik encoding yang digunakan:
+| **product_id** | **model**               | **os**        | **brand**    |
+|----------------|-------------------------|---------------|--------------|
+| P7             | Apple iPhone 14         | iOS v16       | Apple        |
 
-1. **Categorical Encoding**  
-   Categorical encoding adalah teknik untuk mengubah kategori dalam data menjadi angka. Teknik ini sering digunakan untuk data dengan kategori biner, seperti 'ya' dan 'tidak' menjadi nilai numerik, seperti 1 dan 0.
+10 Rekomendasi Produk Teratas Berdasarkan Euclidean Distance
 
-2. **One Hot Encoding**  
-   One Hot Encoding adalah teknik yang mengubah setiap nilai kategori menjadi fitur biner terpisah. Setiap kategori diwakili oleh kolom baru dengan nilai 0 atau 1. Misalnya, untuk kategori "Merah", "Hijau", dan "Biru", kita akan membuat tiga kolom terpisah, dengan satu kolom yang bernilai 1 untuk kategori yang ada, sementara yang lainnya bernilai 0.
+| **product_id** | **os**        | **brand**   | **euclidean_distance** |
+|----------------|---------------|-------------|------------------------|
+| P28            | iOS v16       | Apple       | 0.000000               |
+| P57            | iOS v16       | Apple       | 0.000000               |
+| P101           | iOS v16       | Apple       | 0.000000               |
+| P211           | iOS v16       | Apple       | 0.000000               |
+| P248           | iOS v16       | Apple       | 0.000000               |
+| P291           | iOS v16       | Apple       | 0.000000               |
+| P324           | iOS v16       | Apple       | 0.000000               |
+| P421           | iOS v16       | Apple       | 0.000000               |
+| P637           | iOS v16       | Apple       | 0.000000               |
+| P765           | iOS v16       | Apple       | 0.000000               |
 
-3. **Ordinal Encoding**  
-   Ordinal Encoding digunakan untuk data kategorikal yang memiliki urutan tertentu. Setiap kategori diberikan nilai numerik yang mencerminkan urutan atau ranking. Misalnya, untuk kategori "Rendah", "Sedang", dan "Tinggi", kita bisa memberikan nilai 1, 2, dan 3, yang menunjukkan urutan dari yang terendah ke yang tertinggi.
+##### Euclidean Distance berdasarkan data numeric berdasarkan ram size, storage size, dan battery capacity
+Produk yang Diminta
 
-**Encoding Kategorikal dilakukan terhadap 3 variabel, yaitu :**
-```
-- Extracurricular_Activities : Apakah Siswa Berpartisipasi dalam kegiatan ekstrakurikuler
-- Internet_Access : Apakah Siswa Memiliki Akses ke Internet
-- Learning_Disabilities : Apakah Siswa Memiliki Gangguan Pembelajaran
-```
-Karena masing-masing dari empat variabel tersebut hanya memiliki kategori ya (iya) dan tidak (tidak).
+| **product_id** | **ram_size** | **storage_size** | **battery_capacity** |
+|----------------|--------------|------------------|----------------------|
+| P14            | 6.0          | 128.0            | 5000.0               |
 
-**One Hot Encoding diterapkan pada 2 variabel, yaitu :**
-```
-- School_Type : Jenis sekolah yang dihadiri siswa (Negeri, Swasta)
-- Gender : Jenis kelamin siswa (Laki-laki, Perempuan)
-```
-Karena kategori Gender tidak memiliki urutan tertentu (nominal).
+10 Rekomendasi Produk Teratas Berdasarkan Euclidean Distance
 
-**Encoding Ordinal dilakukan terhadap 8 variabel, yaitu :**
-```
-- Parental_Involvement : Tingkat keterlibatan orang tua dalam pendidikan siswa (Rendah, Sedang, Tinggi)
-- Access_to_Resources : Ketersediaan akses ke sumber daya pendidikan (Rendah, Sedang, Tinggi)
-- Motivation_Level : Tingkat motivasi siswa (Rendah, Sedang, Tinggi)
-- Family_Income : Tingkat pendapatan keluarga (Rendah, Sedang, Tinggi)
-- Teacher_Quality : Kualitas pengajaran (Rendah, Sedang, Tinggi)
-- Peer_Influence : Pengaruh teman sebaya terhadap kinerja akademik (Positif, Netral, Negatif)
-- Parental_Education_Level : Tingkat pendidikan tertinggi orang tua (Sekolah Menengah, Perguruan Tinggi, Pascasarjana)
-- Distance_from_Home : Jarak dari rumah ke sekolah (Dekat, Sedang, Jauh)
-```
-Karena ada urutan dan makna yang jelas, data diatas termasuk dalam kategori ordinal.
+| **product_id** | **ram_size** | **storage_size** | **battery_capacity** | **distance** |
+|----------------|--------------|------------------|----------------------|--------------|
+| P834           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P290           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P151           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P655           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P139           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P138           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P135           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P315           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P634           | 6.0          | 128.0            | 5000.0               | 0.0          |
+| P129           | 6.0          | 128.0            | 5000.0               | 0.0  
 
-### Data Splitting
-Split data dilakukan untuk membagi dataset menjadi bagian pelatihan dan pengujian. Ini penting untuk mengevaluasi kinerja model pada data yang tidak terlihat, mencegah overfitting, dan memastikan model dapat generalisasi dengan baik. Pembagian data menjadi data training dan data testing dilakukan dengan rasio sebagai berikut:
-
-- Data training sebesar 80% untuk melatih model
-- Data testing sebesar 20% untuk menguji model
-
-## Modeling
-Seluruh model yang akan dibuat tidak menggunakan hyperparameter tuning melainkan akan menggunakan beberapa algoritma dan memilih model terbaik sebagai solusi. Sesuai solusi yang ditawarkan pada bagian **_Solution Statement_**, beberapa algoritma yang akan digunakan untuk masalah regresi pada proyek ini adalah _Linear Regression_, _Decision Tree_, _Random Forest_, _Gradient Boosting_, dan _Support Vector regression_. Berikut adalah analisis kelebihan dan kekurangan dari masing-masing algoritma yang digunakan dalam proyek ini:
-
-| **Model**               | **Kelebihan**                                                                                                                                       | **Kekurangan**                                                                                                  |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| **Linear Regression (LR)** | - Sederhana dan mudah dipahami. <br> - Cepat dalam pelatihan dan prediksi. <br> - Memiliki interpretasi yang jelas (koefisien menunjukkan pengaruh variabel). | - Hanya dapat menangkap hubungan linear. <br> - Sensitif terhadap outlier. <br> - Mengasumsikan hubungan linear. |
-| **Decision Tree (DT)**    | - Mudah diinterpretasikan dan divisualisasikan. <br> - Mampu menangkap hubungan non-linear. <br> - Tidak memerlukan scaling data.                     | - Rentan terhadap overfitting, terutama dengan data yang kompleks. <br> - Sensitif terhadap perubahan kecil.    |
-| **Random Forest (RF)**   | - Lebih robust dibandingkan Decision Tree, mengurangi risiko overfitting. <br> - Mampu menangkap interaksi yang kompleks antar fitur. <br> - Memberikan estimasi pentingnya fitur. | - Lebih lambat dalam pelatihan dan prediksi. <br> - Kurang interpretatif dibandingkan model linear. <br> - Memerlukan lebih banyak memori. |
-| **Gradient Boosting (GB)**| - Mampu menangkap hubungan non-linear yang kompleks. <br> - Umumnya memberikan performa yang sangat baik dalam banyak kasus. <br> - Mampu mengatasi missing values. | - Rentan terhadap overfitting jika tidak dituning dengan baik. <br> - Lebih lambat dalam pelatihan. <br> - Memerlukan pemahaman yang lebih dalam tentang hyperparameter. |
-| **Support Vector Regression (SVR)** | - Mampu menangkap hubungan non-linear dengan kernel yang tepat. <br> - Robust terhadap overfitting, terutama di dimensi tinggi. <br> - Efektif pada dataset kecil hingga menengah. | - Tidak efisien pada dataset yang sangat besar. <br> - Memerlukan pemilihan kernel yang tepat dan tuning hyperparameter. <br> - Sulit dalam interpretasi model. |
-
-#### 1. Linear Regression (LR)
-
-**Cara Kerja:**
-- Linear Regression bertujuan untuk menemukan hubungan linier antara variabel independen (input) dan variabel dependen (output).
-- Model mencoba meminimalkan *Mean Squared Error (MSE)*, yaitu perbedaan rata-rata kuadrat antara nilai prediksi dan nilai aktual.
-- Persamaan yang dihasilkan adalah garis regresi dalam bentuk:
-  y = β₀ + β₁x₁ + β₂x₂ + ... + βₙxₙ + ε
-y: Variabel dependen (output/prediksi)
-β: Koefisien regresi (kemiringan)
-x: Variabel independen (fitur input)
-ε: Error atau noise
-
----
-
-#### 2. Decision Tree (DT)
-
-**Cara Kerja:**
-- Decision Tree bekerja dengan membagi dataset menjadi subset berdasarkan fitur tertentu.
-- Setiap pemisahan (*split*) dibuat berdasarkan kriteria seperti:
-  - *Gini Impurity*
-  - *Information Gain*
-- Proses ini diulang secara rekursif hingga mencapai daun (*leaf*), di mana setiap daun mewakili nilai prediksi.
-- Struktur akhirnya adalah pohon dengan:
-  - Keputusan di setiap simpul (*node*) internal
-  - Prediksi di daun
-- Persamaan yang digunakan adalah:
-Prediction = Weighted_Average(Leaf_Values)
-Leaf Values: Nilai target pada setiap daun (misal rata-rata target untuk regresi).
-Weighted Average: Berdasarkan jumlah data di masing-masing cabang.
----
-
-#### 3. Random Forest (RF)
-
-**Cara Kerja:**
-- Random Forest adalah kumpulan (*ensemble*) dari banyak Decision Tree yang bekerja secara bersamaan.
-- Model membagi dataset menjadi subset secara acak dan melatih setiap Decision Tree pada subset yang berbeda.
-- Untuk prediksi:
-  - *Voting mayoritas* digunakan untuk klasifikasi.
-  - Rata-rata prediksi digunakan untuk regresi.
-- Metode *bagging* digunakan untuk mengurangi overfitting dengan mengkombinasikan hasil dari banyak model sederhana.
-- Persamaan yang digunakan adalah:
-Prediction = Mean(Tree₁_Output, Tree₂_Output, ..., Treeₖ_Output)
-Treeₖ: Output dari setiap Decision Tree dalam hutan.
-Mean: Digunakan untuk regresi (rata-rata hasil semua pohon).
-Voting Majority: Untuk klasifikasi (mayoritas hasil pohon).
-
----
-
-#### 4. Gradient Boosting (GB)
-
-**Cara Kerja:**
-- Gradient Boosting membangun model secara bertahap, dengan setiap model baru bertujuan untuk memperbaiki error dari model sebelumnya.
-- Algoritma ini mengoptimalkan *loss function* (misalnya MSE untuk regresi) menggunakan metode *gradient descent*.
-- Model baru dilatih pada *residuals* (selisih antara prediksi sebelumnya dan nilai aktual) dari model sebelumnya.
-- Setelah beberapa iterasi, model akhir adalah kombinasi dari semua model individu, menghasilkan prediksi yang lebih baik.
-- Persamaan yang digunakan adalah:
-Fₘ(x) = Fₘ₋₁(x) + η * hₘ(x)
-Fₘ(x): Model pada iterasi ke-m.
-Fₘ₋₁(x): Model dari iterasi sebelumnya.
-η: Learning rate (kecepatan pembelajaran).
-hₘ(x): Weak learner pada iterasi ke-m (biasanya Decision Tree kecil).
----
-
-#### 5. Support Vector Regression (SVR)
-
-**Cara Kerja:**
-- SVR adalah variasi dari Support Vector Machine (SVM) yang dirancang untuk regresi.
-- Tujuan utama adalah menemukan hyperplane (dalam dimensi tinggi) yang memprediksi nilai output dengan margin error maksimum \( \epsilon \) dan meminimalkan error.
-- Titik data yang berada di luar margin error dihukum dalam fungsi loss.
-- Dengan kernel (misalnya *RBF* atau *Polynomial*), SVR dapat memodelkan hubungan non-linear antara input dan output.
-- Persamaan yang digunakan adalah:
-f(x) = Σ(αᵢ - α*ᵢ) K(xᵢ, x) + b
-αᵢ, α*ᵢ: Koefisien Lagrange.
-K(xᵢ, x): Kernel function (contohnya linear, polynomial, atau RBF).
-b: Bias.
-f(x): Prediksi untuk x.
-
-
----
-Berikut adalah sintaks kode Python untuk instansiasi algoritma-algoritma yanng digunakan, pelatihan model, dan prediksi nilai oleh model:
-
-**Linear Regression**
-***Parameter:***
-Default
-```
-# Membuat dan melatih model regresi linier
-model_lr = LinearRegression()
-model_lr.fit(X_train, y_train)
-
-# Prediksi
-predictions_lr = model_lr.predict(X_test)
-```
-
-**Decision Tree**
-***Parameter:***
-Parameter max_depth digunakan untuk menentukan kedalaman maksimum dari pohon keputusan yang akan dibangun. max_depth=10 berarti bahwa pohon keputusan tidak akan memiliki lebih dari 10 tingkat.
-```
-# Membuat dan melatih model decision tree
-model_dt = DecisionTreeRegressor(max_depth=10)
-model_dt.fit(X_train, y_train)
-
-# Prediksi dan evaluasi
-predictions_dt = model_dt.predict(X_test)
-```
-
-**Random Forest**
-***Parameter:***
-Parameter n_estimators digunakan untuk jumlah pohon keputusan (decision trees) yang akan dibangun dalam hutan acak (random forest). n_estimators=100 berarti 100 pohon keputusan akan dibangun.
-
-Parameter random_state adalah nilai integer yang digunakan untuk mengatur seed generator angka acak. Dalam pelatihan model ini, random_state=30 berarti bahwa generator angka acak akan menggunakan seed 30. Ini membantu dalam membuat eksperimen yang konsisten dan dapat direproduksi.
-```
-# Membuat dan melatih model random forest
-model_rf = RandomForestRegressor(n_estimators=100, random_state=30)
-model_rf.fit(X_train, y_train)
-
-# Prediksi
-predictions_rf = model_rf.predict(X_test)
-```
-
-**Gradient Boosting**
-***Parameter:***
-Dalam pelatihan model ini, n_estimators=100 berarti 100 model akan dibangun.
-
-Parameter learning rate digunakan untuk mengontrol seberapa besar kontribusi setiap model baru terhadap prediksi akhir. Learning_rate=0.1 menunjukkan bahwa setiap model berkontribusi 10% terhadap prediksi akhir. 
-
-max_depth=3 berarti setiap pohon tidak akan memiliki lebih dari 3 tingkat. Ini membantu menjaga model agar tetap sederhana.
-```
-# Membuat dan melatih model gradient boosting
-model_gb = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=3)
-model_gb.fit(X_train, y_train)
-
-# Prediksi dan evaluasi
-predictions_gb = model_gb.predict(X_test)
-```
-
-**Support Vector Regression (SVR)**
-***Parameter:***
-Parameter ini menentukan jenis fungsi kernel yang digunakan untuk memetakan data ke ruang dimensi yang lebih tinggi. 
-
-Pada perintah dibawah, kernel='rbf' menunjukkan bahwa kernel yang digunakan adalah RBF. Ini adalah pilihan umum dalam banyak aplikasi SVR karena fleksibilitasnya.
-```
-# Membuat dan melatih model support vector regression
-model_svr = SVR(kernel='rbf')
-model_svr.fit(X_train, y_train)
-
-# Prediksi dan evaluasi
-predictions_svr = model_svr.predict(X_test)
-```
-
-
-
-## Evaluation
-### Metrik Evaluasi
-Berikut adalah metrik evaluasi yang digunakan:
-
-1. **Mean Squared Error (MSE)**  
-   Formula:
+### Collaborative Filtering 
+### Dengan KKN 
+KNN digunakan untuk mencari "tetangga terdekat", yaitu pengguna atau item yang memiliki pola interaksi atau preferensi yang serupa. Berikut adalah langkah-langkah dasar dalam Collaborative Filtering menggunakan KNN:
+1. **Matriks Rating**:
+   - Data input berupa matriks rating yang berisi informasi rating atau interaksi yang diberikan pengguna terhadap item (misalnya, film, produk).
    
-   MSE = $\frac{1}{n} \sum_{i=1}^{n} (y_{\text{true},i} - y_{\text{pred},i})^2$
+2. **Mencari Kemiripan (Similarity)**:
+   - Menggunakan algoritma KNN untuk menghitung kemiripan antara pengguna atau item berdasarkan rating atau preferensi mereka.
+   - Ukuran kemiripan umum yang digunakan adalah **Cosine Similarity** atau **Euclidean Distance**.
    
-   Dimana:  
-   - $\( y_{\text{true},i} \)$ adalah nilai sebenarnya untuk data ke-\(i\).  
-   - $\( y_{\text{pred},i} \)$ adalah nilai prediksi untuk data ke-\(i\).  
-   - $\( n \)$ adalah jumlah data.  
+3. **Menentukan K (Jumlah Tetangga)**:
+   - KNN membutuhkan parameter `K` untuk menentukan jumlah tetangga terdekat yang akan dipertimbangkan untuk rekomendasi. Misalnya, jika `K=5`, maka lima pengguna atau item terdekat akan digunakan untuk menghasilkan rekomendasi.
 
-3. **Mean Absolute Error (MAE)**  
-   Formula:
+4. **Membuat Rekomendasi**:
+   - Berdasarkan kemiripan yang dihitung, produk yang disukai oleh tetangga terdekat akan direkomendasikan kepada pengguna target.
+
+**Kelebihan:**
+
+1. **Mudah Dipahami dan Implementasi**: Algoritma sederhana dan dapat diimplementasikan dengan mudah.
+2. **Tidak Memerlukan Model Global**: Tidak ada pelatihan model yang rumit, hanya berdasarkan data yang ada.
+3. **Cocok untuk Data yang Tidak Terstruktur**: Dapat digunakan dengan data yang tidak memerlukan bentuk tertentu atau preprocessing yang kompleks.
+
+**Kekurangan:**
+
+1. **Komputasi Berat**: Menghitung jarak untuk setiap prediksi membutuhkan banyak sumber daya, terutama untuk dataset besar.
+2. **Kurang Efektif dengan Data Spars**: KNN kurang efektif ketika data memiliki banyak nilai yang hilang atau sparse.
+3. **Memerlukan Banyak Memori**: Harus menyimpan seluruh dataset untuk melakukan prediksi, yang bisa menjadi tidak efisien pada skala besar.
+```
+knn_model = NearestNeighbors(metric='euclidean', algorithm='brute')
+knn_model.fit(scaled_features)
+```
+Melatih model menggunakan data scaled_features, yang merupakan data fitur yang sudah dinormalisasi atau diskalakan.
+```
+recommendations = recommend_products('P14', num_recommendations=5)
+```
+
+Informasi Produk yang Dimasukkan:
+| product_id | model                             | price | rating |
+|------------|-----------------------------------|-------|--------|
+| P14        | Vivo T1 5G (6GB RAM + 128GB)      | 16990 | 80.0   |
+
+Rekomendasi untuk Produk P14:
+| product_id | model                                    | price | rating | distance  |
+|------------|------------------------------------------|-------|--------|-----------|
+| P543       | OPPO K10 (8GB RAM + 128GB)              | 16990 | 80.0   | 0.000000  |
+| P6         | Samsung Galaxy F23 5G (6GB RAM + 128GB) | 16999 | 80.0   | 0.000248  |
+| P315       | Motorola Moto G71 5G                    | 16999 | 80.0   | 0.000248  |
+| P320       | Honor X9 5G                             | 16999 | 80.0   | 0.000248  |
+| P696       | Infinix Note 13 Pro                     | 16999 | 80.0   | 0.000248  |
+
+### Dengan Auto Encoder 
+Autoencoder adalah jenis jaringan saraf yang digunakan untuk mempelajari representasi terkompresi dari data. Dalam konteks sistem rekomendasi, Autoencoder dapat digunakan untuk melakukan **Collaborative Filtering** dengan mempelajari representasi tersembunyi (latent representation) dari data pengguna dan item. Autoencoder bekerja dengan cara memampatkan informasi input menjadi bentuk yang lebih kecil dan kemudian mencoba merekonstruksi input tersebut seakurat mungkin.
+
+Langkah-langkah dalam Collaborative Filtering dengan Autoencoder:
+
+1. **Preprocessing Data**:
+   - Membuat matriks pengguna-item dengan rating atau interaksi pengguna terhadap item tertentu. Jika data kosong (belum ada rating), autoencoder akan mencoba memprediksi rating tersebut.
    
-   MAE = $\frac{1}{n} \sum_{i=1}^{n} \lvert y_{\text{true},i} - y_{\text{pred},i} \rvert$
+2. **Pelatihan Autoencoder**:
+   - Autoencoder dilatih untuk mempelajari representasi tersembunyi dari data tersebut. Selama pelatihan, model berusaha untuk meminimalkan error antara rating yang diprediksi dan rating asli yang ada.
 
-   Dimana:  
-   - $\( y_{\text{true},i} \)$ adalah nilai sebenarnya untuk data ke-\(i\).  
-   - $\( y_{\text{pred},i} \)$ adalah nilai prediksi untuk data ke-\(i\).  
-   - $\( n \)$ adalah jumlah data.  
+3. **Rekonstruksi dan Rekomendasi**:
+   - Setelah pelatihan selesai, model autoencoder dapat digunakan untuk menghasilkan rekomendasi dengan memprediksi rating untuk item yang belum diberikan rating oleh pengguna. Produk atau item yang memiliki rating prediksi tertinggi akan direkomendasikan.
+ 
+**Kelebihan:**
 
-### Evaluasi Model
-Berikut adalah hasil metrik yang didapatkan dari masing-masing proses evaluasi algoritma:
+1. **Pengurangan Dimensi**:
+   - Autoencoder mengurangi dimensi data, yang memungkinkan pemrosesan data yang lebih efisien dan mengurangi masalah sparsity pada matriks pengguna-item.
 
-| Model | Mean Squared Error (MSE) | Mean Absolute Error (MAE) |
-|-------|--------------------------|---------------------------|
-| LR    | 3.508515                 | 0.454501                  |
-| DT    | 13.946788                | 1.773880                  |
-| RF    | 5.225100                 | 1.142210                  |
-| GB    | 4.387732                 | 0.832583                  |
-| SVR   | 5.093583                 | 1.139980                  |
+2. **Menangani Data yang Tidak Terlalu Terkurasi**:
+   - Autoencoder dapat menangani matriks yang lebih jarang (sparse matrix), sehingga memungkinkan pemahaman yang lebih baik tentang hubungan tersembunyi antara pengguna dan item.
 
-Lebih jelasnya, hasil evaluasi model-model yang digunakan digambarkan pada grafik berikut:
+3. **Kemampuan Generalisasi yang Lebih Baik**:
+   - Dengan model yang lebih sederhana, Autoencoder dapat menangani pola preferensi yang lebih kompleks, dan lebih baik dalam memberikan rekomendasi kepada pengguna baru atau item baru (masalah cold-start).
 
-![image](https://github.com/user-attachments/assets/e1fbe47c-94a6-4beb-8858-347cdcec3672)
+**Kekurangan:**
 
-- Berdasarkan grafik "Perbandingan Performa Model", model Linear Regression (LR) memiliki nilai Mean Squared Error (MSE) terendah, yaitu 3.51, serta nilai Mean Absolute Error (MAE) yang juga cukup rendah. Ini menunjukkan bahwa model Linear Regression memiliki akurasi prediksi terbaik di antara model-model yang dibandingkan.
+1. **Kompleksitas Model**:
+   - Proses pelatihan Autoencoder membutuhkan lebih banyak waktu dan sumber daya komputasi dibandingkan dengan metode collaborative filtering tradisional.
 
-- Model Gradient Boosting (GB) juga menunjukkan performa yang sangat baik, dengan nilai MSE 4.39 dan MAE yang relatif rendah. Meskipun sedikit lebih tinggi dibandingkan Linear Regression, Gradient Boosting masih merupakan salah satu model terbaik dalam kasus ini.
+2. **Tantangan dalam Pengaturan Hyperparameter**:
+   - Menentukan jumlah neuron yang tepat di layer tersembunyi atau memilih arsitektur yang tepat dapat menjadi tantangan dalam pelatihan Autoencoder.
 
-- Sementara itu, model Random Forest (RF) memiliki nilai MSE 5.23 dan MAE yang sedikit lebih tinggi. Support Vector Regression (SVR) memiliki nilai MSE 5.09 dan MAE yang juga lebih tinggi daripada Linear Regression dan Gradient Boosting. Meskipun masih menunjukkan performa yang cukup baik, model-model ini tidak unggul dibandingkan Linear Regression dan Gradient Boosting.
+3. **Cold Start Problem**:
+   - Masalah ini tetap ada pada pengguna baru atau item baru, meskipun model Autoencoder lebih mampu menangani masalah ini dibandingkan metode berbasis KNN tradisional.
 
-- Model Decision Tree (DT) memiliki nilai MSE paling tinggi, yaitu 12.82, serta nilai MAE yang juga lebih buruk daripada model-model lainnya. Ini menunjukkan bahwa model Decision Tree memiliki performa paling rendah di antara model-model yang dibandingkan.
+```
+input_layer = Input(shape=(scaled_features.shape[1],))
+encoded = Dense(64, activation='relu')(input_layer)
+encoded = Dense(32, activation='relu')(encoded)
+encoded = Dense(16, activation='relu')(encoded)
 
-**Secara keseluruhan, dapat disimpulkan bahwa model Linear Regression merupakan model terbaik berdasarkan nilai MSE dan MAE yang paling rendah.**
+decoded = Dense(32, activation='relu')(encoded)
+decoded = Dense(64, activation='relu')(decoded)
+output_layer = Dense(scaled_features.shape[1], activation='linear')(decoded)
 
-### Contoh 10 Data Prediksi
-Berikut adalah 10 contoh perbandingan nilai asli dan hasil prediksi model yang digunakan:
+autoencoder = Model(input_layer, output_layer)
+autoencoder.compile(optimizer=Adam(), loss='mse')
+```
 
-| **Index** | **y_true** | **prediksi_LR** | **prediksi_DT** | **prediksi_RF** | **prediksi_GB** | **prediksi_SVR** |
-|-----------|------------|-----------------|-----------------|-----------------|-----------------|------------------|
-| 3024      | 62         | 62.123519       | 61.625000       | 63.71           | 63.707048       | 63.343930        |
-| 2754      | 65         | 65.053911       | 64.888889       | 64.17           | 65.266467       | 63.599576        |
-| 6363      | 70         | 69.709080       | 67.287500       | 68.32           | 68.856883       | 68.401405        |
-| 3753      | 63         | 63.315235       | 62.645161       | 63.10           | 62.564249       | 63.268075        |
-| 5154      | 62         | 61.858399       | 61.285714       | 61.59           | 61.404107       | 62.536896        |
-| 2339      | 66         | 65.883455       | 66.500000       | 66.75           | 66.371123       | 66.859308        |
-| 3500      | 68         | 67.799348       | 68.000000       | 69.08           | 68.613654       | 68.869134        |
-| 1563      | 66         | 66.603065       | 65.000000       | 68.31           | 67.139535       | 65.750518        |
-| 4493      | 65         | 64.944518       | 65.650000       | 65.15           | 65.212079       | 65.453077        |
-| 1001      | 72         | 72.611754       | 71.500000       | 72.90           | 72.266877       | 72.486120        |
+Input Layer: Input(shape=(scaled_features.shape[1],)) – Lapisan input menerima data dengan jumlah fitur yang sesuai dengan jumlah kolom dalam scaled_features.
 
-Berdasarkan tabel di atas, kita dapat melihat bahwa model Linear Regression (LR) memiliki prediksi yang paling mendekati nilai aktual (y_true) di antara model-model yang dibandingkan.
+Encoder: Tiga lapisan Dense (fully connected) yang mengurangi dimensi fitur secara bertahap dari 64 ke 32 dan kemudian ke 16, menggunakan fungsi aktivasi ReLU.
 
-### Feature Importance
-Analisis fitur terpenting dilakukan menggunakan framework SHAP (SHapley Additive exPlanations) untuk melihat pengaruh fitur-fitur dalam dataset terhadap prediksi model. Berikut adalah hasil analisis fitur terpenting terhadap model Linear Regression sebagai model dengan performa terbaik menggunakan SHAP:
+Decoder: Tiga lapisan Dense yang membangun kembali dimensi fitur, dimulai dari 32 ke 64 dan akhirnya ke ukuran fitur asli menggunakan fungsi aktivasi ReLU dan linear.
 
-![image](https://github.com/user-attachments/assets/97dc0631-74e8-4cb4-9219-f54da3da3c3d)
+```
+autoencoder.fit(scaled_features, scaled_features, epochs=50, batch_size=32, shuffle=True)
+```
+Perintah ini melatih model autoencoder menggunakan data yang telah diskalakan
+```
+recommendations = recommend_products_deep_learning('P8', num_recommendations=5)
+```
+Informasi Produk yang Dimasukkan:
+| product_id | model                              | price | rating |
+|------------|------------------------------------|-------|--------|
+| P8         | Xiaomi Redmi Note 12 Pro Plus     | 29999 | 86.0   |
 
-Dari hasil visualisasi di atas, didapatkan bahwa:
-- **Attendance** dan **Hours_Studied** memiliki dampak terbesar pada prediksi model. Kehadiran yang tinggi dan jam belajar yang banyak berhubungan dengan nilai prediksi yang lebih tinggi.
-- **Access_to_Resources**, **Parental_Involvement**, dan **Previous_Scores** juga memberikan pengaruh signifikan, meskipun lebih kecil dibandingkan dengan **Attendance** dan **Hours_Studied**.
-- **Gender_Male**, **School_Type_Public**, dan **Sleep_Hours** memiliki dampak kecil pada model, dengan nilai SHAP yang lebih terpusat di sekitar 0.
-- Pada fitur **Parental_Education_Level**, tingkat pendidikan orang tua yang lebih tinggi meningkatkan prediksi model, sementara tingkat pendidikan yang lebih rendah menurunkan prediksi.
+Rekomendasi Produk Teratas:
+| product_id | model                             | price | rating | similarity |
+|------------|-----------------------------------|-------|--------|------------|
+| P8         | Xiaomi Redmi Note 12 Pro Plus    | 29999 | 86.0   | 1.000000   |
+| P360       | Poco F4 (12GB RAM + 256GB)       | 29999 | 86.0   | 1.000000   |
+| P747       | Xiaomi Mi 10T Pro 5G             | 29999 | 86.0   | 1.000000   |
+| P154       | Oppo A98                          | 30990 | 87.0   | 0.999910   |
+| P37        | Oppo Reno 8T                      | 29990 | 87.0   | 0.999889   |
 
-## Conclusion
-Proyek ini bertujuan untuk memahami faktor-faktor yang memengaruhi kinerja akademik siswa, menentukan faktor utama, serta membangun model prediksi nilai ujian. Berdasarkan analisis data dan eksperimen model, berikut adalah poin-poin utama kesimpulan yang dapat menjawab problem statement dan mencapai goals proyek ini:
+### Evaluasi 
+#### Metrik Evaluasi: Mean Squared Error (MSE)
 
-### Model Prediksi Terbaik  
-Dari berbagai model yang diuji (**Linear Regression**, **Decision Tree**, **Random Forest**, **Gradient Boosting**, dan **Support Vector Regression**), **Linear Regression** menunjukkan performa terbaik dengan nilai **MSE terendah (3.51)** dan **MAE terendah (0.45)**. Hal ini mengindikasikan bahwa model ini memiliki kemampuan prediksi yang paling akurat dalam kasus ini.
+**MSE (Mean Squared Error)** digunakan untuk mengukur perbedaan antara nilai yang diprediksi oleh model dengan nilai yang sebenarnya. Dalam konteks ini, MSE digunakan untuk mengukur kesalahan prediksi berdasarkan jarak antara produk uji dan rata-rata produk tetangga terdekat.
 
-### Faktor Utama yang Mempengaruhi Nilai Ujian  
-Berdasarkan analisis feature importance menggunakan metode SHAP, didapatkan 5 fitur dengan pengaruh paling signifikan terhadap nilai ujian adalah sebagai berikut:
-1. **Attendance**
-2. **Hours_Studied**
-3. **Access_to_Resources**
-4. **Parental_Involvement**
-5. **Previous_Scores**
+MSE = (1 / n) * Σ (y_i - ŷ_i)²
 
-### Implikasi Praktis  
-- **Untuk Sekolah**: Peningkatan kehadiran siswa sangat penting. Sekolah dapat merancang kebijakan yang memotivasi siswa untuk hadir secara teratur, seperti memberikan penghargaan bagi siswa dengan kehadiran tinggi atau meningkatkan keterlibatan siswa dalam aktivitas kelas. Selain itu, program belajar tambahan atau bimbingan dapat dioptimalkan untuk membantu siswa yang kurang hadir.  
-- **Untuk Orang Tua**: Orang tua harus lebih terlibat dalam proses pendidikan anak, khususnya dalam mendukung jam belajar dan kehadiran mereka di sekolah. Orang tua dapat membantu menciptakan rutinitas belajar yang lebih terstruktur di rumah dan memotivasi anak untuk berpartisipasi aktif dalam kegiatan sekolah.  
-- **Untuk Kebijakan Pendidikan**: Memperbaiki akses ke sumber daya pendidikan sangat penting untuk mendukung hasil akademik. Pemerintah dan lembaga pendidikan dapat meningkatkan kualitas fasilitas pendidikan, memperluas akses ke alat belajar yang lebih baik, serta memastikan bahwa siswa mendapatkan dukungan yang cukup dari lingkungan sosial mereka.  
+Di mana:
 
-### Rekomendasi Intervensi Berbasis Data  
-1. **Peningkatan Kehadiran Siswa**: Mengimplementasikan program penghargaan atau insentif untuk siswa yang memiliki kehadiran tinggi, serta menyediakan sistem pemantauan untuk mendeteksi siswa dengan tingkat absensi tinggi dan memberikan dukungan tambahan.  
-2. **Peningkatan Jam Belajar**: Sekolah dapat menyediakan lebih banyak sesi bimbingan atau kelas tambahan untuk mendukung jam belajar siswa, terutama bagi mereka yang membutuhkan bantuan lebih.  
-3. **Peningkatan Akses ke Sumber Daya Pendidikan**: Menyediakan lebih banyak akses ke bahan ajar digital, buku, atau alat bantu belajar lainnya, dan memperbaiki infrastruktur sekolah untuk mendukung pembelajaran yang lebih baik.  
-4. **Keterlibatan Orang Tua**: Menyelenggarakan lebih banyak kegiatan yang melibatkan orang tua, seperti workshop atau seminar tentang cara mendukung anak-anak mereka dalam belajar dan menciptakan lingkungan belajar yang kondusif di rumah.  
-5. **Peningkatan Kualitas Pendidikan Sebelumnya**: Memberikan dukungan ekstra kepada siswa yang memiliki skor rendah sebelumnya, termasuk sesi remedial atau bimbingan khusus, agar mereka dapat mengejar ketertinggalan dan memperbaiki hasil akademiknya.
+y_i adalah nilai sebenarnya (data observasi),
 
+ŷ_i adalah nilai prediksi (nilai yang diprediksi oleh model),
+n adalah jumlah data atau sampel.
+
+MSE mengukur rata-rata kuadrat perbedaan antara nilai prediksi dan nilai sebenarnya, semakin kecil nilai MSE, semakin baik prediksi model.
+
+##### Evaluasi model KKN Menggunakan manual cross-validation
+```
+average_error = manual_cross_val(knn_model, scaled_features, n_splits=3)
+```
+Menghasilkan 
+Average error from manual cross-validation: **0.14964355364582532**
+
+Nilai ini menunjukkan bahwa rata-rata perbedaan (error) antara produk uji dan prediksi berdasarkan jarak tetangga terdekat adalah sekitar 0.15.
+
+Nilai 0.15 merupakan kesalahan yang relatif kecil dalam konteks data, maka model ini dapat dianggap cukup baik.
+
+##### Evaluasi model Auto Encoder 
+```
+reconstructed_features = autoencoder.predict(scaled_features)
+mse = np.mean(np.square(scaled_features - reconstructed_features), axis=1)
+average_mse = np.mean(mse)
+```
+Kode ini melakukan rekonstruksi data menggunakan autoencoder dan menghitung Mean Squared Error (MSE) untuk menilai kualitas rekonstruksi.
+
+Rekonstruksi Data:
+
+reconstructed_features = autoencoder.predict(scaled_features) melakukan prediksi terhadap data yang telah diubah (scaled_features) menggunakan model autoencoder. Ini menghasilkan data yang telah direkonstruksi oleh autoencoder.
+Hitung MSE per Data:
+
+mse = np.mean(np.square(scaled_features - reconstructed_features), axis=1) menghitung MSE untuk setiap contoh data, dengan membandingkan antara data asli (scaled_features) dan data yang telah direkonstruksi (reconstructed_features).
+Hitung Rata-rata MSE:
+
+average_mse = np.mean(mse) menghitung rata-rata MSE dari seluruh data untuk mendapatkan nilai kesalahan keseluruhan dari proses rekonstruksi.
+
+Output:
+Rata-rata MSE: 0.0025
+
+Nilai Rata-rata MSE = 0.0025 menunjukkan bahwa model autoencoder berhasil melakukan rekonstruksi data dengan cukup baik.
